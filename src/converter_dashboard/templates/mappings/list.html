@@ -54,12 +54,17 @@
                 </td>
                 <td>
                     <div class="btn-group btn-group-sm">
-                        <a href="{{ url_for('edit_mapping', mapping_id=id) }}" class="btn btn-outline-primary">
-                            Edit
+                        <a href="{{ url_for('edit_mapping', mapping_id=id) }}" class="btn btn-outline-primary" title="Table Editor">
+                            <i class="bi bi-table"></i>
+                        </a>
+                        <a href="{{ url_for('visual_mapping', mapping_id=id) }}" class="btn btn-outline-success" title="Visual Editor">
+                            <i class="bi bi-diagram-3"></i>
                         </a>
                         <form action="{{ url_for('delete_mapping', mapping_id=id) }}" method="post" class="d-inline"
                               onsubmit="return confirm('Delete this mapping?')">
-                            <button type="submit" class="btn btn-outline-danger">Delete</button>
+                            <button type="submit" class="btn btn-outline-danger" title="Delete">
+                                <i class="bi bi-trash"></i>
+                            </button>
                         </form>
                     </div>
                 </td>

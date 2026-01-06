@@ -3,8 +3,8 @@
 {% block title %}Preview - {{ filename }}{% endblock %}
 
 {% block head %}
-<!-- DataTables CSS -->
-<link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css">
+<!-- DataTables CSS (local) -->
+<link rel="stylesheet" href="{{ url_for('static', filename='vendor/dataTables.bootstrap5.min.css') }}">
 <style>
     .error-row {
         background-color: #f8d7da !important;
@@ -162,9 +162,9 @@
 {% endblock %}
 
 {% block scripts %}
-<!-- DataTables JS -->
-<script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
-<script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+<!-- DataTables JS (local) -->
+<script src="{{ url_for('static', filename='vendor/dataTables.min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/dataTables.bootstrap5.min.js') }}"></script>
 
 <script>
 const sourceId = "{{ source.id }}";

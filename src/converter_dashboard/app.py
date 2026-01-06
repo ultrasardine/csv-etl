@@ -398,6 +398,55 @@ def create_app(config: dict | None = None) -> Flask:
             flash("Mapping not found", "error")
         return redirect(url_for("list_mappings"))
 
+    @app.route("/mappings/<mapping_id>/visual", methods=["GET"])
+    def visual_mapping(mapping_id: str):
+        """Visual drag-and-drop mapping editor."""
+        mapping = spec_store.get_mapping(mapping_id)
+        if not mapping:
+            flash("Mapping not found", "error")
+            return redirect(url_for("list_mappings"))
+
+        source = spec_store.get_source(mapping.source_id)
+        destination = spec_store.get_destination(mapping.destination_id)
+
+        if not source or not destination:
+            flash("Invalid source or destination in mapping", "error")
+            return redirect(url_for("list_mappings"))
+
+        return render_template(
+            "mappings/visual.html",
+            mapping=mapping,
+            source=source,
+            destination=destination,
+            transform_types=TransformType
+        )
+
+    @app.route("/api/mappings/<mapping_id>/save", methods=["POST"])
+    def api_save_mapping(mapping_id: str):
+        """Save mapping from visual editor."""
+        mapping = spec_store.get_mapping(mapping_id)
+        if not mapping:
+            return jsonify({"error": "Mapping not found"}), 404
+
+        data = request.get_json()
+        field_mappings = data.get("field_mappings", [])
+        filter_rules = data.get("filter_rules", [])
+
+        # Update mapping
+        mapping.field_mappings = [
+            FieldMapping(
+                destination_field=fm["destination_field"],
+                source_field=fm.get("source_field"),
+                transform_type=TransformType(fm.get("transform_type", "direct")),
+                transform_config=fm.get("transform_config", {}),
+            )
+            for fm in field_mappings
+        ]
+        mapping.filter_rules = filter_rules
+
+        spec_store.save_mapping(mapping)
+        return jsonify({"success": True, "message": "Mapping saved"})
+
     # =========================================================================
     # API Routes
     # =========================================================================

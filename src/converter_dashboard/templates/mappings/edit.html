@@ -5,6 +5,14 @@
 {% block content %}
 <h2>{{ 'Edit' if mapping else 'New' }} ETL Mapping</h2>
 
+{% if mapping %}
+<div class="mb-3">
+    <a href="{{ url_for('visual_mapping', mapping_id=mapping.id) }}" class="btn btn-outline-success btn-sm">
+        <i class="bi bi-diagram-3"></i> Open Visual Editor
+    </a>
+</div>
+{% endif %}
+
 <form method="post" id="mappingForm">
     <div class="card mb-4">
         <div class="card-header">Basic Information</div>
