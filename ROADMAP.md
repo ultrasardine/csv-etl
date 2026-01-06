@@ -52,12 +52,28 @@ This document outlines planned features and improvements for CSV-ETL.
 - [ ] Row filtering in visual editor
 - [ ] Multi-step pipelines (chain transformations)
 
+### Authentication & User Management
+- [ ] User registration and login
+- [ ] OAuth providers (Google, GitHub)
+- [ ] User profiles with settings
+- [ ] Password reset flow
+
+### Permissions & Sharing
+- [ ] Private sources, destinations, and mappings (default)
+- [ ] Public sources, destinations, and mappings (discoverable by all users)
+- [ ] Share with specific users:
+  - [ ] View-only permission
+  - [ ] Edit permission
+- [ ] Organization/team support
+- [ ] Activity audit log
+
 ### UI/UX Improvements
 - [ ] Dark mode
 - [ ] Conversion history and logs
 - [ ] Mapping templates library
 - [ ] Bulk file processing
 - [ ] Progress indicators for large files
+- [ ] User dashboard with owned and shared resources
 
 ## Contributing
 
