@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Converter{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0">File Management</h4>
+    <a href="{{ url_for('index') }}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-clockwise"></i> Refresh Files
+    </a>
+</div>
+
+<div class="row">
+    <!-- Sources Section -->
+    <div class="col-md-6 mb-4">
+        <h4><i class="bi bi-box-arrow-in-right"></i> Input Sources</h4>
+        
+        {% for spec_id, spec in sources.items() %}
+        <div class="card mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>{{ spec.name }}</span>
+            </div>
+            <div class="card-body">
+                <p class="text-muted small mb-2">{{ spec.description }}</p>
+                <p class="small mb-2"><strong>Directory:</strong> <code>data/in/{{ spec.default_directory }}/</code></p>
+                
+                <!-- Upload Form -->
+                <form action="{{ url_for('upload_file', source_id=spec_id) }}" method="post" enctype="multipart/form-data" class="mb-3">
+                    <div class="input-group input-group-sm">
+                        <input type="file" name="file" accept=".csv" class="form-control" required>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-upload"></i> Upload
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Process with Mapping -->
+                {% if source_mappings[spec_id] %}
+                <form action="{{ url_for('process_files', source_id=spec_id) }}" method="post" class="mb-3">
+                    <div class="input-group input-group-sm">
+                        <select name="mapping_id" class="form-select" required>
+                            <option value="">Select mapping...</option>
+                            {% for mapping in source_mappings[spec_id] %}
+                            <option value="{{ mapping.id }}">{{ mapping.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-play-fill"></i> Process
+                        </button>
+                    </div>
+                </form>
+                {% else %}
+                <div class="alert alert-warning py-1 px-2 small mb-3">
+                    No mappings configured. <a href="{{ url_for('new_mapping') }}">Create one</a>.
+                </div>
+                {% endif %}
+
+                <!-- File List -->
+                <div class="file-list">
+                    {% if source_files[spec_id] %}
+                        <ul class="list-group list-group-flush">
+                        {% for file in source_files[spec_id] %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center py-1">
+                                <span class="small"><i class="bi bi-file-earmark-text"></i> {{ file.name }}</span>
+                                <form action="{{ url_for('delete_file', file_type='input', filepath=spec.default_directory + '/' + file.name) }}" method="post" class="d-inline">
+                                    <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('Delete this file?')">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            </li>
+                        {% endfor %}
+                        </ul>
+                    {% else %}
+                        <p class="text-muted small mb-0">No files</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Destinations Section -->
+    <div class="col-md-6 mb-4">
+        <h4><i class="bi bi-box-arrow-right"></i> Output Destinations</h4>
+        
+        {% for spec_id, spec in destinations.items() %}
+        <div class="card mb-3">
+            <div class="card-header">{{ spec.name }}</div>
+            <div class="card-body">
+                <p class="text-muted small mb-2">{{ spec.description }}</p>
+                <p class="small mb-2"><strong>Directory:</strong> <code>data/out/{{ spec.default_directory }}/</code></p>
+
+                <!-- File List -->
+                <div class="file-list">
+                    {% if output_files[spec_id] %}
+                        <ul class="list-group list-group-flush">
+                        {% for file in output_files[spec_id] %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center py-1">
+                                <span class="small"><i class="bi bi-file-earmark-check"></i> {{ file.name }}</span>
+                                <div>
+                                    <a href="{{ url_for('download_file', filepath=spec.default_directory + '/' + file.name) }}" class="btn btn-outline-primary btn-sm">
+                                        <i class="bi bi-download"></i>
+                                    </a>
+                                    <form action="{{ url_for('delete_file', file_type='output', filepath=spec.default_directory + '/' + file.name) }}" method="post" class="d-inline">
+                                        <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('Delete this file?')">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                </div>
+                            </li>
+                        {% endfor %}
+                        </ul>
+                    {% else %}
+                        <p class="text-muted small mb-0">No files</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Quick Stats -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">ETL Mappings</div>
+            <div class="card-body">
+                {% if mappings %}
+                <div class="table-responsive">
+                    <table class="table table-sm mb-0">
+                        <thead>
+                            <tr>
+                                <th>Mapping</th>
+                                <th>Source → Destination</th>
+                                <th>Fields</th>
+                                <th>Filters</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for id, mapping in mappings.items() %}
+                            <tr>
+                                <td><a href="{{ url_for('edit_mapping', mapping_id=id) }}">{{ mapping.name }}</a></td>
+                                <td>
+                                    {{ sources[mapping.source_id].name if mapping.source_id in sources else mapping.source_id }}
+                                    →
+                                    {{ destinations[mapping.destination_id].name if mapping.destination_id in destinations else mapping.destination_id }}
+                                </td>
+                                <td><span class="badge bg-info">{{ mapping.field_mappings|length }}</span></td>
+                                <td><span class="badge bg-secondary">{{ mapping.filter_rules|length }}</span></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="mb-0">No mappings configured. <a href="{{ url_for('new_mapping') }}">Create your first mapping</a>.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

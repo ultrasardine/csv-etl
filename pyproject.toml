@@ -1,0 +1,31 @@
+[project]
+name = "csv-etl"
+version = "0.1.0"
+description = "A configurable ETL pipeline for converting CSV files between different formats"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "flask>=3.0.0",
+]
+
+[project.scripts]
+csv-etl = "converter.cli:main"
+csv-etl-dashboard = "converter_dashboard.run:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/converter", "src/converter_dashboard"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true

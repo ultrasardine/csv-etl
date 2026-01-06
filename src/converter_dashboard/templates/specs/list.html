@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}{{ spec_type|title }}s - Ghostfolio Converter{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4><i class="bi bi-list-ul"></i> {{ spec_type|title }} Specs</h4>
+    <a href="{{ url_for('new_' + spec_type) }}" class="btn btn-primary">
+        <i class="bi bi-plus-lg"></i> New {{ spec_type|title }}
+    </a>
+</div>
+
+{% if specs %}
+<div class="table-responsive">
+    <table class="table table-hover">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Description</th>
+                <th>Directory</th>
+                <th>Columns</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for spec_id, spec in specs.items() %}
+            <tr>
+                <td><strong>{{ spec.name }}</strong></td>
+                <td class="text-muted">{{ spec.description }}</td>
+                <td><code>{{ spec.default_directory }}</code></td>
+                <td>{{ spec.columns|length }}</td>
+                <td>
+                    <a href="{{ url_for('edit_' + spec_type, spec_id=spec_id) }}" class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-pencil"></i>
+                    </a>
+                    <form action="{{ url_for('delete_' + spec_type, spec_id=spec_id) }}" method="post" class="d-inline">
+                        <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('Delete this spec?')">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="alert alert-info">
+    No {{ spec_type }}s defined yet. <a href="{{ url_for('new_' + spec_type) }}">Create one</a>.
+</div>
+{% endif %}
+{% endblock %}

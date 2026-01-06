@@ -1,0 +1,369 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Edit' if mapping else 'New' }} Mapping{% endblock %}
+
+{% block content %}
+<h2>{{ 'Edit' if mapping else 'New' }} ETL Mapping</h2>
+
+<form method="post" id="mappingForm">
+    <div class="card mb-4">
+        <div class="card-header">Basic Information</div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="name" class="form-label">Name</label>
+                        <input type="text" class="form-control" id="name" name="name" required
+                               value="{{ mapping.name if mapping else '' }}">
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Description</label>
+                        <input type="text" class="form-control" id="description" name="description"
+                               value="{{ mapping.description if mapping else '' }}">
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="source_id" class="form-label">Source</label>
+                        <select class="form-select" id="source_id" name="source_id" required onchange="onSourceChange()">
+                            <option value="">Select source...</option>
+                            {% for id, source in sources.items() %}
+                            <option value="{{ id }}" {{ 'selected' if mapping and mapping.source_id == id else '' }}>
+                                {{ source.name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="destination_id" class="form-label">Destination</label>
+                        <select class="form-select" id="destination_id" name="destination_id" required onchange="onDestinationChange()">
+                            <option value="">Select destination...</option>
+                            {% for id, dest in destinations.items() %}
+                            <option value="{{ id }}" {{ 'selected' if mapping and mapping.destination_id == id else '' }}>
+                                {{ dest.name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>Field Mappings</span>
+            <button type="button" class="btn btn-sm btn-outline-primary" onclick="addFieldMapping()">
+                <i class="bi bi-plus"></i> Add Field
+            </button>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-sm" id="fieldMappingsTable">
+                    <thead>
+                        <tr>
+                            <th>
+                                Destination Field
+                                <i class="bi bi-question-circle text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
+                                   title="The column in the output file where the value will be written"></i>
+                            </th>
+                            <th>
+                                Source Field
+                                <i class="bi bi-question-circle text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
+                                   title="The column from the input file. Leave empty for constants or formulas"></i>
+                            </th>
+                            <th>
+                                Transform
+                                <i class="bi bi-question-circle text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
+                                   title="How to transform: direct, constant, date_format, lookup, suffix, prefix, formula"></i>
+                            </th>
+                            <th>
+                                Config (JSON)
+                                <i class="bi bi-question-circle text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
+                                   title="JSON config for transform. See examples below."></i>
+                            </th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody id="fieldMappingsBody">
+                        <!-- Rows will be populated by JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="alert alert-info py-2 small mt-3">
+                <strong>Transform Types:</strong>
+                <ul class="mb-0 ps-3">
+                    <li><code>direct</code> - Copy value as-is</li>
+                    <li><code>constant</code> - Fixed value: <code>{"value": "USD"}</code></li>
+                    <li><code>date_format</code> - Convert date: <code>{"input_format": "%Y-%m-%dT%H:%M:%S", "output_format": "%Y-%m-%d"}</code></li>
+                    <li><code>lookup</code> - Map values: <code>{"BUY": "B", "SELL": "S", "_default": null}</code></li>
+                    <li><code>suffix</code>/<code>prefix</code> - Add text: <code>{"value": "-USD"}</code></li>
+                    <li><code>formula</code> - Calculate: <code>{"expression": "Quantity * Price"}</code></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>
+                Filter Rules (skip rows matching these)
+                <i class="bi bi-question-circle text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
+                   title="Rows matching these conditions will be skipped"></i>
+            </span>
+            <button type="button" class="btn btn-sm btn-outline-primary" onclick="addFilterRule()">
+                <i class="bi bi-plus"></i> Add Filter
+            </button>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-sm" id="filterRulesTable">
+                    <thead>
+                        <tr>
+                            <th>Source Field</th>
+                            <th>Operator</th>
+                            <th>Value(s)</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody id="filterRulesBody">
+                        <!-- Rows will be populated by JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">Save Mapping</button>
+        <a href="{{ url_for('list_mappings') }}" class="btn btn-secondary">Cancel</a>
+    </div>
+</form>
+
+<script>
+// Column data
+let sourceColumns = [];
+let destColumns = [];
+
+// Existing mapping data (for edit mode)
+const existingFieldMappings = {{ (mapping.field_mappings | map(attribute='__dict__') | list | tojson) if mapping and mapping.field_mappings else '[]' | safe }};
+const existingFilterRules = {{ (mapping.filter_rules | tojson) if mapping and mapping.filter_rules else '[]' | safe }};
+
+// Transform types
+const transformTypes = [
+    {% for tt in transform_types %}
+    "{{ tt.value }}"{% if not loop.last %},{% endif %}
+    {% endfor %}
+];
+
+document.addEventListener('DOMContentLoaded', async function() {
+    // Load columns and populate rows
+    await loadColumns();
+    populateExistingData();
+});
+
+async function loadColumns() {
+    const sourceId = document.getElementById('source_id').value;
+    const destId = document.getElementById('destination_id').value;
+    
+    if (sourceId) {
+        try {
+            const response = await fetch(`/api/sources/${sourceId}/columns`);
+            sourceColumns = await response.json();
+        } catch (e) {
+            console.error('Failed to load source columns:', e);
+            sourceColumns = [];
+        }
+    }
+    
+    if (destId) {
+        try {
+            const response = await fetch(`/api/destinations/${destId}/columns`);
+            destColumns = await response.json();
+        } catch (e) {
+            console.error('Failed to load destination columns:', e);
+            destColumns = [];
+        }
+    }
+}
+
+function populateExistingData() {
+    // Populate field mappings
+    existingFieldMappings.forEach(fm => {
+        addFieldMapping(fm.destination_field, fm.source_field, fm.transform_type?.value || fm.transform_type, fm.transform_config);
+    });
+    
+    // Populate filter rules
+    existingFilterRules.forEach(rule => {
+        addFilterRule(rule.field, rule.operator, rule.values || [rule.value]);
+    });
+}
+
+async function onSourceChange() {
+    const sourceId = document.getElementById('source_id').value;
+    if (sourceId) {
+        try {
+            const response = await fetch(`/api/sources/${sourceId}/columns`);
+            sourceColumns = await response.json();
+        } catch (e) {
+            sourceColumns = [];
+        }
+    } else {
+        sourceColumns = [];
+    }
+    // Update all source field dropdowns
+    document.querySelectorAll('.source-field-select').forEach(select => {
+        const currentValue = select.value;
+        populateSourceSelect(select, currentValue);
+    });
+}
+
+async function onDestinationChange() {
+    const destId = document.getElementById('destination_id').value;
+    if (destId) {
+        try {
+            const response = await fetch(`/api/destinations/${destId}/columns`);
+            destColumns = await response.json();
+        } catch (e) {
+            destColumns = [];
+        }
+    } else {
+        destColumns = [];
+    }
+    // Update all destination field dropdowns
+    document.querySelectorAll('.dest-field-select').forEach(select => {
+        const currentValue = select.value;
+        populateDestSelect(select, currentValue);
+    });
+}
+
+function populateSourceSelect(select, selectedValue) {
+    select.innerHTML = '<option value="">(none - for constants)</option>';
+    sourceColumns.forEach(col => {
+        const option = document.createElement('option');
+        option.value = col.name;
+        option.textContent = col.name;
+        if (col.name === selectedValue) option.selected = true;
+        select.appendChild(option);
+    });
+}
+
+function populateDestSelect(select, selectedValue) {
+    select.innerHTML = '<option value="">-- Select --</option>';
+    destColumns.forEach(col => {
+        const option = document.createElement('option');
+        option.value = col.name;
+        option.textContent = col.name;
+        if (col.name === selectedValue) option.selected = true;
+        select.appendChild(option);
+    });
+}
+
+function addFieldMapping(destField = '', sourceField = '', transformType = 'direct', transformConfig = {}) {
+    const tbody = document.getElementById('fieldMappingsBody');
+    const row = document.createElement('tr');
+    
+    // Create destination select
+    const destSelect = document.createElement('select');
+    destSelect.className = 'form-select form-select-sm dest-field-select';
+    destSelect.name = 'dest_field[]';
+    populateDestSelect(destSelect, destField);
+    
+    // Create source select
+    const sourceSelect = document.createElement('select');
+    sourceSelect.className = 'form-select form-select-sm source-field-select';
+    sourceSelect.name = 'source_field[]';
+    populateSourceSelect(sourceSelect, sourceField);
+    
+    // Create transform select
+    const transformSelect = document.createElement('select');
+    transformSelect.className = 'form-select form-select-sm';
+    transformSelect.name = 'transform_type[]';
+    transformTypes.forEach(tt => {
+        const option = document.createElement('option');
+        option.value = tt;
+        option.textContent = tt;
+        if (tt === transformType) option.selected = true;
+        transformSelect.appendChild(option);
+    });
+    
+    // Create config input
+    const configInput = document.createElement('input');
+    configInput.type = 'text';
+    configInput.className = 'form-control form-control-sm';
+    configInput.name = 'transform_config[]';
+    if (transformConfig && Object.keys(transformConfig).length > 0) {
+        configInput.value = JSON.stringify(transformConfig);
+    }
+    
+    // Build row
+    row.innerHTML = '<td></td><td></td><td></td><td></td><td><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest(\'tr\').remove()">×</button></td>';
+    row.cells[0].appendChild(destSelect);
+    row.cells[1].appendChild(sourceSelect);
+    row.cells[2].appendChild(transformSelect);
+    row.cells[3].appendChild(configInput);
+    
+    tbody.appendChild(row);
+}
+
+function addFilterRule(field = '', operator = 'not_in', values = []) {
+    const tbody = document.getElementById('filterRulesBody');
+    const row = document.createElement('tr');
+    
+    // Create field select (uses source columns)
+    const fieldSelect = document.createElement('select');
+    fieldSelect.className = 'form-select form-select-sm source-field-select';
+    fieldSelect.name = 'filter_field[]';
+    populateSourceSelect(fieldSelect, field);
+    // Change first option text
+    fieldSelect.options[0].textContent = '-- Select --';
+    
+    // Create operator select
+    const operatorSelect = document.createElement('select');
+    operatorSelect.className = 'form-select form-select-sm';
+    operatorSelect.name = 'filter_operator[]';
+    const operators = [
+        {value: 'equals', text: 'equals'},
+        {value: 'not_equals', text: 'not equals'},
+        {value: 'in', text: 'in list'},
+        {value: 'not_in', text: 'not in list'},
+        {value: 'is_empty', text: 'is empty'},
+        {value: 'contains', text: 'contains'}
+    ];
+    operators.forEach(op => {
+        const option = document.createElement('option');
+        option.value = op.value;
+        option.textContent = op.text;
+        if (op.value === operator) option.selected = true;
+        operatorSelect.appendChild(option);
+    });
+    
+    // Create value input
+    const valueInput = document.createElement('input');
+    valueInput.type = 'text';
+    valueInput.className = 'form-control form-control-sm';
+    valueInput.name = 'filter_value[]';
+    valueInput.placeholder = 'DEPOSIT, WITHDRAWAL';
+    if (Array.isArray(values) && values.length > 0) {
+        valueInput.value = values.join(', ');
+    } else if (values) {
+        valueInput.value = values;
+    }
+    
+    // Build row
+    row.innerHTML = '<td></td><td></td><td></td><td><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest(\'tr\').remove()">×</button></td>';
+    row.cells[0].appendChild(fieldSelect);
+    row.cells[1].appendChild(operatorSelect);
+    row.cells[2].appendChild(valueInput);
+    
+    tbody.appendChild(row);
+}
+</script>
+{% endblock %}

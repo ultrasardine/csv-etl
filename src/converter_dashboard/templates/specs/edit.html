@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Edit' if spec else 'New' }} {{ spec_type|title }} - Ghostfolio Converter{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8">
+        <h4>
+            <i class="bi bi-{{ 'pencil' if spec else 'plus-lg' }}"></i>
+            {{ 'Edit' if spec else 'New' }} {{ spec_type|title }}
+        </h4>
+
+        <form method="post">
+            <!-- Basic Info -->
+            <div class="card mb-3">
+                <div class="card-header">Basic Information</div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Name *</label>
+                            <input type="text" name="name" class="form-control" required
+                                   value="{{ spec.name if spec else '' }}">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Default Directory *</label>
+                            <input type="text" name="default_directory" class="form-control" required
+                                   value="{{ spec.default_directory if spec else '' }}"
+                                   placeholder="e.g., revolut_stocks">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea name="description" class="form-control" rows="2">{{ spec.description if spec else '' }}</textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- File Settings -->
+            <div class="card mb-3">
+                <div class="card-header">File Settings</div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Delimiter</label>
+                            <select name="delimiter" class="form-select">
+                                <option value="," {{ 'selected' if not spec or spec.delimiter == ',' else '' }}>Comma (,)</option>
+                                <option value=";" {{ 'selected' if spec and spec.delimiter == ';' else '' }}>Semicolon (;)</option>
+                                <option value="\t" {{ 'selected' if spec and spec.delimiter == '\t' else '' }}>Tab</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Encoding</label>
+                            <select name="encoding" class="form-select">
+                                <option value="utf-8" {{ 'selected' if not spec or spec.encoding == 'utf-8' else '' }}>UTF-8</option>
+                                <option value="latin-1" {{ 'selected' if spec and spec.encoding == 'latin-1' else '' }}>Latin-1</option>
+                                <option value="cp1252" {{ 'selected' if spec and spec.encoding == 'cp1252' else '' }}>Windows-1252</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Has Header Row</label>
+                            <div class="form-check mt-2">
+                                <input type="checkbox" name="has_header" class="form-check-input" id="hasHeader"
+                                       {{ 'checked' if not spec or spec.has_header else '' }}>
+                                <label class="form-check-label" for="hasHeader">Yes</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Columns -->
+            <div class="card mb-3">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span>Columns</span>
+                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="addColumn()">
+                        <i class="bi bi-plus"></i> Add Column
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div id="columns-container">
+                        {% if spec and spec.columns %}
+                            {% for col in spec.columns %}
+                            <div class="column-row row mb-2 align-items-end">
+                                <div class="col-md-3">
+                                    <label class="form-label small">Name</label>
+                                    <input type="text" name="col_name[]" class="form-control form-control-sm" value="{{ col.name }}">
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label small">Type</label>
+                                    <select name="col_type[]" class="form-select form-select-sm">
+                                        {% for ct in column_types %}
+                                        <option value="{{ ct.value }}" {{ 'selected' if col.type == ct else '' }}>{{ ct.value }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label small">Source Name</label>
+                                    <input type="text" name="col_source[]" class="form-control form-control-sm" value="{{ col.source_name or '' }}" placeholder="Original column">
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label small">Max Length</label>
+                                    <input type="number" name="col_length[]" class="form-control form-control-sm" value="{{ col.max_length or '' }}">
+                                </div>
+                                <div class="col-md-1">
+                                    <label class="form-label small">Req</label>
+                                    <div class="form-check">
+                                        <input type="checkbox" name="col_required[]" class="form-check-input" value="{{ loop.index0 }}" {{ 'checked' if col.required else '' }}>
+                                    </div>
+                                </div>
+                                <div class="col-md-1">
+                                    <button type="button" class="btn btn-outline-danger btn-sm" onclick="removeColumn(this)">
+                                        <i class="bi bi-x"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-check-lg"></i> Save
+                </button>
+                <a href="{{ url_for('list_' + spec_type + 's') }}" class="btn btn-outline-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Column Template -->
+<template id="column-template">
+    <div class="column-row row mb-2 align-items-end">
+        <div class="col-md-3">
+            <label class="form-label small">Name</label>
+            <input type="text" name="col_name[]" class="form-control form-control-sm">
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small">Type</label>
+            <select name="col_type[]" class="form-select form-select-sm">
+                {% for ct in column_types %}
+                <option value="{{ ct.value }}">{{ ct.value }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label small">Source Name</label>
+            <input type="text" name="col_source[]" class="form-control form-control-sm" placeholder="Original column">
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small">Max Length</label>
+            <input type="number" name="col_length[]" class="form-control form-control-sm">
+        </div>
+        <div class="col-md-1">
+            <label class="form-label small">Req</label>
+            <div class="form-check">
+                <input type="checkbox" name="col_required[]" class="form-check-input">
+            </div>
+        </div>
+        <div class="col-md-1">
+            <button type="button" class="btn btn-outline-danger btn-sm" onclick="removeColumn(this)">
+                <i class="bi bi-x"></i>
+            </button>
+        </div>
+    </div>
+</template>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function addColumn() {
+    const template = document.getElementById('column-template');
+    const container = document.getElementById('columns-container');
+    const clone = template.content.cloneNode(true);
+    container.appendChild(clone);
+}
+
+function removeColumn(btn) {
+    btn.closest('.column-row').remove();
+}
+</script>
+{% endblock %}

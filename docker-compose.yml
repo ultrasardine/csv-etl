@@ -1,0 +1,72 @@
+version: "3.9"
+
+services:
+  ghostfolio-postgres:
+    image: postgres:15-alpine
+    container_name: ghostfolio-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ghostfolio
+      POSTGRES_USER: ghostfolio
+      POSTGRES_PASSWORD: change_this_postgres_pwd
+    volumes:
+      - ./postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ghostfolio -d ghostfolio"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  ghostfolio-redis:
+    image: redis:alpine
+    container_name: ghostfolio-redis
+    restart: unless-stopped
+    command: ["redis-server", "--requirepass", "change_this_redis_pwd"]
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a change_this_redis_pwd ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  ghostfolio-app:
+    image: ghostfolio/ghostfolio:latest
+    container_name: ghostfolio-app
+    restart: unless-stopped
+    depends_on:
+      ghostfolio-postgres:
+        condition: service_healthy
+      ghostfolio-redis:
+        condition: service_healthy
+    environment:
+      # DB
+      POSTGRES_DB: ghostfolio
+      POSTGRES_USER: ghostfolio
+      POSTGRES_PASSWORD: change_this_postgres_pwd
+      DATABASE_URL: postgresql://ghostfolio:change_this_postgres_pwd@ghostfolio-postgres:5432/ghostfolio?connect_timeout=300&sslmode=prefer
+      # Redis
+      REDIS_HOST: ghostfolio-redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: change_this_redis_pwd
+      # App
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 3333
+      ACCESS_TOKEN_SALT: change_this_long_random_string
+      JWT_SECRET_KEY: change_this_other_long_random_string
+    ports:
+      - "3333:3333"
+
+  csv-etl-dashboard:
+    build:
+      context: .
+      dockerfile: src/converter_dashboard/Dockerfile
+    container_name: csv-etl-dashboard
+    restart: unless-stopped
+    environment:
+      FLASK_DEBUG: "0"
+      SECRET_KEY: change_this_dashboard_secret
+      PORT: 5001
+    volumes:
+      - ./data:/app/data
+    ports:
+      - "5001:5001"

@@ -1,0 +1,226 @@
+{
+  "revolut_stocks": {
+    "id": "revolut_stocks",
+    "name": "Revolut Stocks",
+    "description": "Revolut stock trading CSV export",
+    "default_directory": "revolut_stocks",
+    "columns": [
+      {
+        "name": "Date",
+        "type": "datetime",
+        "source_name": null,
+        "max_length": null,
+        "required": false,
+        "default": null,
+        "date_format": null
+      },
+      {
+        "name": "Ticker",
+        "type": "string",
+        "source_name": null,
+        "max_length": null,
+        "required": false,
+        "default": null,
+        "date_format": null
+      },
+      {
+        "name": "Type",
+        "type": "string",
+        "source_name": null,
+        "max_length": null,
+        "required": false,
+        "default": null,
+        "date_format": null
+      },
+      {
+        "name": "Quantity",
+        "type": "float",
+        "source_name": null,
+        "max_length": null,
+        "required": false,
+        "default": null,
+        "date_format": null
+      },
+      {
+        "name": "Price per share",
+        "type": "money",
+        "source_name": null,
+        "max_length": null,
+        "required": false,
+        "default": null,
+        "date_format": null
+      },
+      {
+        "name": "Total Amount",
+        "type": "money",
+        "source_name": null,
+        "max_length": null,
+        "required": false,
+        "default": null,
+        "date_format": null
+      },
+      {
+        "name": "Currency",
+        "type": "string",
+        "source_name": null,
+        "max_length": 3,
+        "required": false,
+        "default": null,
+        "date_format": null
+      }
+    ],
+    "delimiter": ",",
+    "encoding": "utf-8",
+    "has_header": true
+  },
+  "revolut_crypto": {
+    "id": "revolut_crypto",
+    "name": "Revolut Crypto",
+    "description": "Revolut crypto trading CSV export",
+    "default_directory": "revolut_crypto",
+    "columns": [
+      {
+        "name": "Symbol",
+        "type": "string",
+        "source_name": null,
+        "max_length": null,
+        "required": false,
+        "default": null,
+        "date_format": null
+      },
+      {
+        "name": "Type",
+        "type": "string",
+        "source_name": null,
+        "max_length": null,
+        "required": false,
+        "default": null,
+        "date_format": null
+      },
+      {
+        "name": "Quantity",
+        "type": "float",
+        "source_name": null,
+        "max_length": null,
+        "required": false,
+        "default": null,
+        "date_format": null
+      },
+      {
+        "name": "Price",
+        "type": "money",
+        "source_name": null,
+        "max_length": null,
+        "required": false,
+        "default": null,
+        "date_format": null
+      },
+      {
+        "name": "Value",
+        "type": "money",
+        "source_name": null,
+        "max_length": null,
+        "required": false,
+        "default": null,
+        "date_format": null
+      },
+      {
+        "name": "Fees",
+        "type": "money",
+        "source_name": null,
+        "max_length": null,
+        "required": false,
+        "default": null,
+        "date_format": null
+      },
+      {
+        "name": "Date",
+        "type": "datetime",
+        "source_name": null,
+        "max_length": null,
+        "required": false,
+        "default": null,
+        "date_format": "%b %d, %Y, %I:%M:%S %p"
+      }
+    ],
+    "delimiter": ",",
+    "encoding": "utf-8",
+    "has_header": true
+  },
+  "teste_source_1": {
+    "id": "teste_source_1",
+    "name": "teste_source_1",
+    "description": "",
+    "default_directory": "teste_source_1",
+    "columns": [
+      {
+        "name": "1",
+        "type": "integer",
+        "source_name": "1",
+        "max_length": null,
+        "required": false,
+        "default": null,
+        "date_format": null
+      },
+      {
+        "name": "2",
+        "type": "string",
+        "source_name": "2",
+        "max_length": null,
+        "required": false,
+        "default": null,
+        "date_format": null
+      },
+      {
+        "name": "3",
+        "type": "string",
+        "source_name": "3",
+        "max_length": null,
+        "required": false,
+        "default": null,
+        "date_format": null
+      }
+    ],
+    "delimiter": ",",
+    "encoding": "utf-8",
+    "has_header": true
+  },
+  "test_source": {
+    "id": "test_source",
+    "name": "Test Source",
+    "description": "A test source",
+    "default_directory": "test_source",
+    "columns": [
+      {
+        "name": "Name",
+        "type": "string",
+        "source_name": null,
+        "max_length": null,
+        "required": false,
+        "default": null,
+        "date_format": null
+      },
+      {
+        "name": "Amount",
+        "type": "money",
+        "source_name": null,
+        "max_length": null,
+        "required": false,
+        "default": null,
+        "date_format": null
+      },
+      {
+        "name": "Date",
+        "type": "date",
+        "source_name": null,
+        "max_length": null,
+        "required": false,
+        "default": null,
+        "date_format": null
+      }
+    ],
+    "delimiter": ",",
+    "encoding": "utf-8",
+    "has_header": true
+  }
+}

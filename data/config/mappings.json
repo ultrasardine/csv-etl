@@ -1,0 +1,206 @@
+{
+  "revolut_stocks_to_ghostfolio": {
+    "id": "revolut_stocks_to_ghostfolio",
+    "name": "Revolut Stocks \u2192 Ghostfolio",
+    "source_id": "revolut_stocks",
+    "destination_id": "ghostfolio",
+    "description": "Convert Revolut stock trades to Ghostfolio format",
+    "field_mappings": [
+      {
+        "destination_field": "date",
+        "source_field": "Date",
+        "transform_type": "date_format",
+        "transform_config": {
+          "input_format": "%Y-%m-%dT%H:%M:%S",
+          "output_format": "%Y-%m-%d"
+        }
+      },
+      {
+        "destination_field": "symbol",
+        "source_field": "Ticker",
+        "transform_type": "direct",
+        "transform_config": {}
+      },
+      {
+        "destination_field": "type",
+        "source_field": "Type",
+        "transform_type": "lookup",
+        "transform_config": {
+          "BUY": "BUY",
+          "SELL": "SELL",
+          "DIVIDEND": "DIVIDEND",
+          "_default": null
+        }
+      },
+      {
+        "destination_field": "quantity",
+        "source_field": "Quantity",
+        "transform_type": "direct",
+        "transform_config": {}
+      },
+      {
+        "destination_field": "unitPrice",
+        "source_field": "Price per share",
+        "transform_type": "direct",
+        "transform_config": {}
+      },
+      {
+        "destination_field": "fee",
+        "source_field": null,
+        "transform_type": "constant",
+        "transform_config": {
+          "value": 0
+        }
+      },
+      {
+        "destination_field": "currency",
+        "source_field": "Currency",
+        "transform_type": "direct",
+        "transform_config": {}
+      },
+      {
+        "destination_field": "account",
+        "source_field": null,
+        "transform_type": "constant",
+        "transform_config": {
+          "value": "Revolut"
+        }
+      },
+      {
+        "destination_field": "dataSource",
+        "source_field": null,
+        "transform_type": "constant",
+        "transform_config": {
+          "value": "YAHOO"
+        }
+      }
+    ],
+    "filter_rules": [
+      {
+        "field": "Type",
+        "operator": "not_in",
+        "values": [
+          "DEPOSIT",
+          "WITHDRAWAL",
+          "CUSTODY FEE",
+          "STOCK SPLIT"
+        ]
+      }
+    ]
+  },
+  "revolut_crypto_to_ghostfolio": {
+    "id": "revolut_crypto_to_ghostfolio",
+    "name": "Revolut Crypto \u2192 Ghostfolio",
+    "source_id": "revolut_crypto",
+    "destination_id": "ghostfolio",
+    "description": "Convert Revolut crypto trades to Ghostfolio format",
+    "field_mappings": [
+      {
+        "destination_field": "date",
+        "source_field": "Date",
+        "transform_type": "date_format",
+        "transform_config": {
+          "input_format": "%b %d, %Y, %I:%M:%S %p",
+          "output_format": "%Y-%m-%d"
+        }
+      },
+      {
+        "destination_field": "symbol",
+        "source_field": "Symbol",
+        "transform_type": "suffix",
+        "transform_config": {
+          "value": "-USD"
+        }
+      },
+      {
+        "destination_field": "type",
+        "source_field": "Type",
+        "transform_type": "lookup",
+        "transform_config": {
+          "Buy": "BUY",
+          "Sell": "SELL",
+          "_default": null
+        }
+      },
+      {
+        "destination_field": "quantity",
+        "source_field": "Quantity",
+        "transform_type": "direct",
+        "transform_config": {}
+      },
+      {
+        "destination_field": "unitPrice",
+        "source_field": "Price",
+        "transform_type": "direct",
+        "transform_config": {}
+      },
+      {
+        "destination_field": "fee",
+        "source_field": "Fees",
+        "transform_type": "direct",
+        "transform_config": {}
+      },
+      {
+        "destination_field": "currency",
+        "source_field": null,
+        "transform_type": "constant",
+        "transform_config": {
+          "value": "USD"
+        }
+      },
+      {
+        "destination_field": "account",
+        "source_field": null,
+        "transform_type": "constant",
+        "transform_config": {
+          "value": "Revolut Crypto"
+        }
+      },
+      {
+        "destination_field": "dataSource",
+        "source_field": null,
+        "transform_type": "constant",
+        "transform_config": {
+          "value": "YAHOO"
+        }
+      }
+    ],
+    "filter_rules": [
+      {
+        "field": "Type",
+        "operator": "not_in",
+        "values": [
+          "Transfer"
+        ]
+      }
+    ]
+  },
+  "teste_mapping_1": {
+    "id": "teste_mapping_1",
+    "name": "teste_mapping_1",
+    "source_id": "teste_source_1",
+    "destination_id": "teste_destination_1",
+    "description": "",
+    "field_mappings": [
+      {
+        "destination_field": "3",
+        "source_field": "1",
+        "transform_type": "direct",
+        "transform_config": {}
+      },
+      {
+        "destination_field": "1",
+        "source_field": "3",
+        "transform_type": "direct",
+        "transform_config": {}
+      },
+      {
+        "destination_field": "2",
+        "source_field": "2",
+        "transform_type": "direct",
+        "transform_config": {}
+      }
+    ],
+    "filter_rules": []
+  }
+}

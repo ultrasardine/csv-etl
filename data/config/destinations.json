@@ -1,0 +1,132 @@
+{
+  "ghostfolio": {
+    "id": "ghostfolio",
+    "name": "Ghostfolio",
+    "description": "Ghostfolio import format",
+    "default_directory": "ghostfolio",
+    "columns": [
+      {
+        "name": "date",
+        "type": "date",
+        "source_name": null,
+        "max_length": null,
+        "required": false,
+        "default": null,
+        "date_format": "%Y-%m-%d"
+      },
+      {
+        "name": "symbol",
+        "type": "string",
+        "source_name": null,
+        "max_length": null,
+        "required": true,
+        "default": null,
+        "date_format": null
+      },
+      {
+        "name": "type",
+        "type": "string",
+        "source_name": null,
+        "max_length": null,
+        "required": true,
+        "default": null,
+        "date_format": null
+      },
+      {
+        "name": "quantity",
+        "type": "float",
+        "source_name": null,
+        "max_length": null,
+        "required": true,
+        "default": null,
+        "date_format": null
+      },
+      {
+        "name": "unitPrice",
+        "type": "float",
+        "source_name": null,
+        "max_length": null,
+        "required": true,
+        "default": null,
+        "date_format": null
+      },
+      {
+        "name": "fee",
+        "type": "float",
+        "source_name": null,
+        "max_length": null,
+        "required": false,
+        "default": null,
+        "date_format": null
+      },
+      {
+        "name": "currency",
+        "type": "string",
+        "source_name": null,
+        "max_length": 3,
+        "required": false,
+        "default": null,
+        "date_format": null
+      },
+      {
+        "name": "account",
+        "type": "string",
+        "source_name": null,
+        "max_length": null,
+        "required": false,
+        "default": null,
+        "date_format": null
+      },
+      {
+        "name": "dataSource",
+        "type": "string",
+        "source_name": null,
+        "max_length": null,
+        "required": false,
+        "default": null,
+        "date_format": null
+      }
+    ],
+    "delimiter": ",",
+    "encoding": "utf-8",
+    "has_header": true
+  },
+  "teste_destination_1": {
+    "id": "teste_destination_1",
+    "name": "teste_destination_1",
+    "description": "",
+    "default_directory": "teste_destination_1",
+    "columns": [
+      {
+        "name": "1",
+        "type": "string",
+        "source_name": "1",
+        "max_length": null,
+        "required": false,
+        "default": null,
+        "date_format": null
+      },
+      {
+        "name": "2",
+        "type": "string",
+        "source_name": "2",
+        "max_length": null,
+        "required": false,
+        "default": null,
+        "date_format": null
+      },
+      {
+        "name": "3",
+        "type": "integer",
+        "source_name": "3",
+        "max_length": null,
+        "required": false,
+        "default": null,
+        "date_format": null
+      }
+    ],
+    "delimiter": ";",
+    "encoding": "utf-8",
+    "has_header": true
+  }
+}
