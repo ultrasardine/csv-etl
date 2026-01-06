@@ -1,0 +1,474 @@
+{% extends "base.html" %}
+
+{% block title %}Preview - {{ filename }}{% endblock %}
+
+{% block head %}
+<!-- DataTables CSS -->
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css">
+<style>
+    .error-row {
+        background-color: #f8d7da !important;
+    }
+    .error-row:hover {
+        background-color: #f1aeb5 !important;
+    }
+    .error-cell {
+        position: relative;
+    }
+    .error-indicator {
+        position: absolute;
+        top: 2px;
+        right: 2px;
+        width: 8px;
+        height: 8px;
+        background-color: #dc3545;
+        border-radius: 50%;
+        cursor: help;
+    }
+    .cell-editable {
+        cursor: pointer;
+        min-height: 20px;
+    }
+    .cell-editable:hover {
+        background-color: #e7f1ff;
+    }
+    .cell-editing {
+        padding: 0 !important;
+    }
+    .cell-editing input {
+        width: 100%;
+        border: 2px solid #0d6efd;
+        padding: 4px 8px;
+        font-size: inherit;
+    }
+    .validation-panel {
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        background: white;
+        padding: 15px;
+        border-bottom: 1px solid #dee2e6;
+        margin-bottom: 15px;
+    }
+    #dataTable td {
+        max-width: 200px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .log-panel {
+        max-height: 200px;
+        overflow-y: auto;
+        font-family: monospace;
+        font-size: 0.8rem;
+        background: #1e1e1e;
+        color: #d4d4d4;
+        padding: 10px;
+        border-radius: 4px;
+    }
+    .log-error { color: #f48771; }
+    .log-success { color: #89d185; }
+    .log-skip { color: #808080; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <a href="{{ url_for('index') }}" class="btn btn-outline-secondary btn-sm me-2">
+            <i class="bi bi-arrow-left"></i> Back
+        </a>
+        <span class="h5 mb-0">{{ source.name }} / {{ filename }}</span>
+    </div>
+</div>
+
+<!-- Validation Panel -->
+<div class="card mb-3 validation-panel">
+    <div class="card-body py-2">
+        <div class="row align-items-center">
+            <div class="col-md-4">
+                <label class="form-label mb-1 small">Select Mapping to Validate</label>
+                <select id="mappingSelect" class="form-select form-select-sm">
+                    <option value="">-- Select mapping --</option>
+                    {% for mapping in mappings %}
+                    <option value="{{ mapping.id }}">{{ mapping.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button id="validateBtn" class="btn btn-primary btn-sm mt-4" disabled>
+                    <i class="bi bi-check-circle"></i> Validate
+                </button>
+            </div>
+            <div class="col-md-4">
+                <div id="validationStats" class="mt-3" style="display: none;">
+                    <span class="badge bg-success me-1" id="statSuccess">0 valid</span>
+                    <span class="badge bg-secondary me-1" id="statSkipped">0 skipped</span>
+                    <span class="badge bg-danger" id="statErrors">0 errors</span>
+                </div>
+            </div>
+            <div class="col-md-2 text-end">
+                <button id="convertBtn" class="btn btn-success btn-sm mt-4" disabled>
+                    <i class="bi bi-arrow-right-circle"></i> Convert
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Data Table -->
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table id="dataTable" class="table table-sm table-bordered table-hover" style="width:100%">
+                <thead class="table-light">
+                    <tr id="headerRow"></tr>
+                </thead>
+                <tbody id="dataBody"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Log Panel (collapsible) -->
+<div class="card mt-3">
+    <div class="card-header py-2 d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-journal-text"></i> Validation Log</span>
+        <button class="btn btn-sm btn-outline-secondary py-0" type="button" data-bs-toggle="collapse" data-bs-target="#logPanel">
+            Toggle
+        </button>
+    </div>
+    <div class="collapse" id="logPanel">
+        <div class="card-body p-0">
+            <div id="logContent" class="log-panel">
+                <div class="text-muted">Select a mapping and click Validate to see logs...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Error Details Modal -->
+<div class="modal fade" id="errorModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white py-2">
+                <h6 class="modal-title"><i class="bi bi-exclamation-triangle"></i> Row Errors</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="errorModalBody"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- DataTables JS -->
+<script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+
+<script>
+const sourceId = "{{ source.id }}";
+const filename = "{{ filename }}";
+let dataTable = null;
+let currentData = { columns: [], rows: [], errors_by_line: {} };
+let selectedMapping = null;
+
+// Load data on page load
+$(document).ready(function() {
+    loadData();
+    
+    $('#mappingSelect').on('change', function() {
+        selectedMapping = $(this).val();
+        $('#validateBtn').prop('disabled', !selectedMapping);
+        $('#convertBtn').prop('disabled', true);
+        // Clear previous validation
+        currentData.errors_by_line = {};
+        $('#validationStats').hide();
+        refreshTableStyles();
+    });
+    
+    $('#validateBtn').on('click', validateData);
+    $('#convertBtn').on('click', convertData);
+});
+
+function loadData() {
+    $.get(`/api/preview/${sourceId}/${filename}`)
+        .done(function(data) {
+            currentData = data;
+            renderTable();
+        })
+        .fail(function(xhr) {
+            alert('Failed to load file: ' + (xhr.responseJSON?.error || 'Unknown error'));
+        });
+}
+
+function renderTable() {
+    // Build header
+    let headerHtml = '<th style="width:60px">Line</th>';
+    currentData.columns.forEach(col => {
+        headerHtml += `<th>${escapeHtml(col)}</th>`;
+    });
+    headerHtml += '<th style="width:40px"></th>';
+    $('#headerRow').html(headerHtml);
+    
+    // Build body
+    let bodyHtml = '';
+    currentData.rows.forEach(row => {
+        const lineNum = row._line;
+        const hasError = currentData.errors_by_line[lineNum];
+        const rowClass = hasError ? 'error-row' : '';
+        
+        bodyHtml += `<tr class="${rowClass}" data-line="${lineNum}">`;
+        bodyHtml += `<td class="text-muted small">${lineNum}</td>`;
+        
+        currentData.columns.forEach(col => {
+            const value = row[col] || '';
+            const cellError = hasError ? hasError.find(e => e.field === col) : null;
+            const cellClass = cellError ? 'error-cell' : '';
+            const errorIndicator = cellError ? `<span class="error-indicator" title="${escapeHtml(cellError.message)}"></span>` : '';
+            
+            bodyHtml += `<td class="cell-editable ${cellClass}" data-col="${escapeHtml(col)}" data-line="${lineNum}" title="${escapeHtml(value)}">`;
+            bodyHtml += escapeHtml(value);
+            bodyHtml += errorIndicator;
+            bodyHtml += '</td>';
+        });
+        
+        // Error info button
+        if (hasError) {
+            bodyHtml += `<td><button class="btn btn-outline-danger btn-sm py-0 px-1 show-errors" data-line="${lineNum}"><i class="bi bi-exclamation-circle"></i></button></td>`;
+        } else {
+            bodyHtml += '<td></td>';
+        }
+        
+        bodyHtml += '</tr>';
+    });
+    $('#dataBody').html(bodyHtml);
+    
+    // Initialize DataTable
+    if (dataTable) {
+        dataTable.destroy();
+    }
+    dataTable = $('#dataTable').DataTable({
+        pageLength: 25,
+        order: [[0, 'asc']],
+        scrollX: true,
+    });
+    
+    // Bind events
+    bindCellEvents();
+}
+
+function bindCellEvents() {
+    // Inline editing
+    $('#dataTable').on('dblclick', '.cell-editable', function() {
+        const $cell = $(this);
+        if ($cell.hasClass('cell-editing')) return;
+        
+        const currentValue = $cell.text().trim();
+        const col = $cell.data('col');
+        const line = $cell.data('line');
+        
+        $cell.addClass('cell-editing');
+        $cell.html(`<input type="text" value="${escapeHtml(currentValue)}" data-original="${escapeHtml(currentValue)}">`);
+        $cell.find('input').focus().select();
+    });
+    
+    // Save on blur or enter
+    $('#dataTable').on('blur', '.cell-editing input', function() {
+        saveCell($(this));
+    });
+    
+    $('#dataTable').on('keydown', '.cell-editing input', function(e) {
+        if (e.key === 'Enter') {
+            saveCell($(this));
+        } else if (e.key === 'Escape') {
+            const $input = $(this);
+            const $cell = $input.closest('td');
+            $cell.removeClass('cell-editing');
+            $cell.text($input.data('original'));
+        }
+    });
+    
+    // Show error details
+    $('#dataTable').on('click', '.show-errors', function() {
+        const line = $(this).data('line');
+        showErrorModal(line);
+    });
+}
+
+function saveCell($input) {
+    const $cell = $input.closest('td');
+    const newValue = $input.val();
+    const originalValue = $input.data('original');
+    const col = $cell.data('col');
+    const line = $cell.data('line');
+    
+    $cell.removeClass('cell-editing');
+    $cell.text(newValue);
+    
+    if (newValue !== originalValue) {
+        // Update local data
+        const row = currentData.rows.find(r => r._line === line);
+        if (row) {
+            row[col] = newValue;
+        }
+        
+        // Save to server
+        $.ajax({
+            url: `/api/preview/${sourceId}/${filename}/update`,
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({ line: line, row: { [col]: newValue } })
+        })
+        .done(function() {
+            $cell.addClass('bg-success-subtle');
+            setTimeout(() => $cell.removeClass('bg-success-subtle'), 1000);
+        })
+        .fail(function(xhr) {
+            alert('Failed to save: ' + (xhr.responseJSON?.error || 'Unknown error'));
+            $cell.text(originalValue);
+            row[col] = originalValue;
+        });
+    }
+}
+
+function validateData() {
+    if (!selectedMapping) return;
+    
+    $('#validateBtn').prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Validating...');
+    
+    $.get(`/api/preview/${sourceId}/${filename}?mapping_id=${selectedMapping}`)
+        .done(function(data) {
+            currentData.errors_by_line = data.errors_by_line;
+            
+            // Update stats
+            if (data.validation) {
+                $('#statSuccess').text(data.validation.success_count + ' valid');
+                $('#statSkipped').text(data.validation.skipped_count + ' skipped');
+                $('#statErrors').text(data.validation.error_count + ' errors');
+                $('#validationStats').show();
+                
+                // Update logs
+                updateLogs(data.validation.logs);
+                
+                // Enable convert if no errors
+                $('#convertBtn').prop('disabled', data.validation.error_count > 0);
+            }
+            
+            refreshTableStyles();
+        })
+        .fail(function(xhr) {
+            alert('Validation failed: ' + (xhr.responseJSON?.error || 'Unknown error'));
+        })
+        .always(function() {
+            $('#validateBtn').prop('disabled', false).html('<i class="bi bi-check-circle"></i> Validate');
+        });
+}
+
+function refreshTableStyles() {
+    $('#dataTable tbody tr').each(function() {
+        const line = $(this).data('line');
+        const hasError = currentData.errors_by_line[line];
+        
+        $(this).toggleClass('error-row', !!hasError);
+        
+        // Update error indicators
+        $(this).find('.cell-editable').each(function() {
+            const col = $(this).data('col');
+            const cellError = hasError ? hasError.find(e => e.field === col) : null;
+            
+            $(this).find('.error-indicator').remove();
+            $(this).toggleClass('error-cell', !!cellError);
+            
+            if (cellError) {
+                $(this).append(`<span class="error-indicator" title="${escapeHtml(cellError.message)}"></span>`);
+            }
+        });
+        
+        // Update error button
+        const $btnCell = $(this).find('td:last');
+        if (hasError) {
+            if (!$btnCell.find('.show-errors').length) {
+                $btnCell.html(`<button class="btn btn-outline-danger btn-sm py-0 px-1 show-errors" data-line="${line}"><i class="bi bi-exclamation-circle"></i></button>`);
+            }
+        } else {
+            $btnCell.empty();
+        }
+    });
+}
+
+function convertData() {
+    if (!selectedMapping) return;
+    
+    $('#convertBtn').prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Converting...');
+    
+    $.ajax({
+        url: `/api/preview/${sourceId}/${filename}/convert`,
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({ mapping_id: selectedMapping })
+    })
+    .done(function(data) {
+        updateLogs(data.logs);
+        alert('Success! ' + data.message + '\nOutput: ' + data.output_file);
+        window.location.href = '/';
+    })
+    .fail(function(xhr) {
+        const resp = xhr.responseJSON || {};
+        updateLogs(resp.logs || []);
+        alert('Conversion failed: ' + (resp.message || 'Unknown error'));
+        
+        // Re-validate to show errors
+        if (resp.errors) {
+            validateData();
+        }
+    })
+    .always(function() {
+        $('#convertBtn').prop('disabled', false).html('<i class="bi bi-arrow-right-circle"></i> Convert');
+    });
+}
+
+function updateLogs(logs) {
+    if (!logs || !logs.length) return;
+    
+    let html = '';
+    logs.forEach(log => {
+        let cls = '';
+        if (log.includes('ERROR') || log.includes('error')) cls = 'log-error';
+        else if (log.includes('success') || log.includes('Valid')) cls = 'log-success';
+        else if (log.includes('Skipped')) cls = 'log-skip';
+        
+        html += `<div class="${cls}">${escapeHtml(log)}</div>`;
+    });
+    $('#logContent').html(html);
+    $('#logPanel').collapse('show');
+}
+
+function showErrorModal(line) {
+    const errors = currentData.errors_by_line[line];
+    if (!errors) return;
+    
+    let html = `<p class="mb-2"><strong>Line ${line}</strong> has ${errors.length} error(s):</p>`;
+    html += '<ul class="list-group">';
+    errors.forEach(err => {
+        html += `<li class="list-group-item list-group-item-danger">`;
+        html += `<strong>${escapeHtml(err.field)}</strong>: ${escapeHtml(err.message)}`;
+        if (err.value) {
+            html += `<br><small class="text-muted">Value: "${escapeHtml(err.value)}"</small>`;
+        }
+        html += '</li>';
+    });
+    html += '</ul>';
+    
+    $('#errorModalBody').html(html);
+    new bootstrap.Modal('#errorModal').show();
+}
+
+function escapeHtml(text) {
+    if (text === null || text === undefined) return '';
+    const div = document.createElement('div');
+    div.textContent = String(text);
+    return div.innerHTML;
+}
+</script>
+{% endblock %}

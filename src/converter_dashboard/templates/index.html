@@ -10,6 +10,111 @@
     </a>
 </div>
 
+<!-- Process Result Panel -->
+{% if last_process_result %}
+<div class="card mb-4 {% if last_process_result.error_count > 0 %}border-warning{% else %}border-success{% endif %}">
+    <div class="card-header d-flex justify-content-between align-items-center {% if last_process_result.error_count > 0 %}bg-warning text-dark{% else %}bg-success text-white{% endif %}">
+        <span>
+            <i class="bi bi-{% if last_process_result.error_count > 0 %}exclamation-triangle{% else %}check-circle{% endif %}"></i>
+            Conversion Result: {{ last_process_result.mapping_name }}
+        </span>
+        <button class="btn btn-sm btn-outline-{% if last_process_result.error_count > 0 %}dark{% else %}light{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#processResultDetails">
+            <i class="bi bi-chevron-down"></i> Details
+        </button>
+    </div>
+    <div class="card-body">
+        <!-- Summary Stats -->
+        <div class="row text-center mb-3">
+            <div class="col-4">
+                <div class="p-2 bg-success bg-opacity-10 rounded">
+                    <h5 class="mb-0 text-success">{{ last_process_result.success_count }}</h5>
+                    <small class="text-muted">Successful</small>
+                </div>
+            </div>
+            <div class="col-4">
+                <div class="p-2 bg-secondary bg-opacity-10 rounded">
+                    <h5 class="mb-0 text-secondary">{{ last_process_result.skipped_count }}</h5>
+                    <small class="text-muted">Skipped</small>
+                </div>
+            </div>
+            <div class="col-4">
+                <div class="p-2 bg-danger bg-opacity-10 rounded">
+                    <h5 class="mb-0 text-danger">{{ last_process_result.error_count }}</h5>
+                    <small class="text-muted">Errors</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Collapsible Details -->
+        <div class="collapse" id="processResultDetails">
+            <!-- Errors Table -->
+            {% if last_process_result.errors %}
+            <div class="mb-3">
+                <h6 class="text-danger"><i class="bi bi-exclamation-circle"></i> Errors</h6>
+                <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+                    <table class="table table-sm table-hover mb-0">
+                        <thead class="table-light sticky-top">
+                            <tr>
+                                <th style="width: 120px;">File</th>
+                                <th style="width: 60px;">Line</th>
+                                <th style="width: 100px;">Field</th>
+                                <th>Error</th>
+                                <th style="width: 120px;">Value</th>
+                                <th style="width: 40px;"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for error in last_process_result.errors %}
+                            <tr class="error-row" data-row-index="{{ loop.index }}">
+                                <td><code class="small">{{ error.file }}</code></td>
+                                <td><span class="badge bg-secondary">{{ error.line }}</span></td>
+                                <td><code class="small text-primary">{{ error.field }}</code></td>
+                                <td class="small text-danger">{{ error.message }}</td>
+                                <td><code class="small text-truncate d-inline-block" style="max-width: 100px;" title="{{ error.value }}">{{ error.value or '-' }}</code></td>
+                                <td>
+                                    <button class="btn btn-outline-secondary btn-sm py-0 px-1" type="button" data-bs-toggle="collapse" data-bs-target="#rowData{{ loop.index }}" title="View row data">
+                                        <i class="bi bi-eye"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr class="collapse" id="rowData{{ loop.index }}">
+                                <td colspan="6" class="bg-light">
+                                    <pre class="mb-0 small" style="max-height: 150px; overflow: auto;">{{ error.row_data | tojson(indent=2) }}</pre>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% if last_process_result.has_more_errors %}
+                <div class="alert alert-info py-1 px-2 small mt-2 mb-0">
+                    <i class="bi bi-info-circle"></i> Showing first 50 errors. Check logs for complete error list.
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            <!-- Verbose Logs -->
+            <div>
+                <h6 class="text-muted">
+                    <i class="bi bi-journal-text"></i> Conversion Log
+                    <button class="btn btn-outline-secondary btn-sm py-0 px-1 ms-2" type="button" data-bs-toggle="collapse" data-bs-target="#verboseLogs">
+                        Toggle
+                    </button>
+                </h6>
+                <div class="collapse" id="verboseLogs">
+                    <div class="bg-dark text-light p-2 rounded" style="max-height: 250px; overflow-y: auto; font-family: monospace; font-size: 0.75rem;">
+                        {% for log in last_process_result.logs %}
+                        <div class="{% if 'ERROR' in log %}text-danger{% elif 'Skipped' in log %}text-secondary{% elif 'success' in log.lower() %}text-success{% endif %}">{{ log }}</div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <div class="row">
     <!-- Sources Section -->
     <div class="col-md-6 mb-4">
@@ -62,11 +167,16 @@
                         {% for file in source_files[spec_id] %}
                             <li class="list-group-item d-flex justify-content-between align-items-center py-1">
                                 <span class="small"><i class="bi bi-file-earmark-text"></i> {{ file.name }}</span>
-                                <form action="{{ url_for('delete_file', file_type='input', filepath=spec.default_directory + '/' + file.name) }}" method="post" class="d-inline">
-                                    <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('Delete this file?')">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
-                                </form>
+                                <div>
+                                    <a href="{{ url_for('preview_file', source_id=spec_id, filename=file.name) }}" class="btn btn-outline-primary btn-sm" title="Preview & Edit">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                    <form action="{{ url_for('delete_file', file_type='input', filepath=spec.default_directory + '/' + file.name) }}" method="post" class="d-inline">
+                                        <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('Delete this file?')">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                </div>
                             </li>
                         {% endfor %}
                         </ul>

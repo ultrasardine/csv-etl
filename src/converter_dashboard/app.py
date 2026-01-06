@@ -53,6 +53,8 @@ def create_app(config: dict | None = None) -> Flask:
     @app.route("/")
     def index():
         """Dashboard home page."""
+        from flask import session
+        
         sources = spec_store.get_sources()
         destinations = spec_store.get_destinations()
         mappings = spec_store.get_mappings()
@@ -80,6 +82,9 @@ def create_app(config: dict | None = None) -> Flask:
         for source_id in sources:
             source_mappings[source_id] = spec_store.get_mappings_for_source(source_id)
 
+        # Get last process result from session
+        last_process_result = session.pop("last_process_result", None)
+
         return render_template(
             "index.html",
             sources=sources,
@@ -88,6 +93,7 @@ def create_app(config: dict | None = None) -> Flask:
             source_files=source_files,
             output_files=output_files,
             source_mappings=source_mappings,
+            last_process_result=last_process_result,
         )
 
     # =========================================================================
@@ -179,13 +185,49 @@ def create_app(config: dict | None = None) -> Flask:
         # Use dynamic transformer with mapping config
         transformer = DynamicTransformer(mapping.to_dict())
 
-        total = 0
+        total_success = 0
+        total_skipped = 0
+        total_errors = 0
+        all_errors = []
+        all_logs = []
+
         for csv_file in input_dir.glob("*.csv"):
             output_file = output_dir / f"{csv_file.stem}_{destination.id}.csv"
-            count = transformer.transform_file(csv_file, output_file)
-            total += count
+            result = transformer.transform_file(csv_file, output_file, fail_on_error=True)
+            total_success += result.success_count
+            total_skipped += result.skipped_count
+            total_errors += result.error_count
+            
+            # Collect errors with file context
+            for error in result.errors:
+                all_errors.append({
+                    "file": csv_file.name,
+                    "line": error.line_number,
+                    "field": error.field,
+                    "message": error.error_message,
+                    "value": str(error.source_value) if error.source_value else "",
+                    "row_data": error.row_data
+                })
+            
+            all_logs.extend([f"[{csv_file.name}] {log}" for log in result.log_messages])
 
-        flash(f"Processed {total} records using '{mapping.name}'", "success")
+        # Store results in session for display
+        from flask import session
+        session["last_process_result"] = {
+            "mapping_name": mapping.name,
+            "success_count": total_success,
+            "skipped_count": total_skipped,
+            "error_count": total_errors,
+            "errors": all_errors[:50],  # Limit to 50 errors for display
+            "logs": all_logs[-100:],  # Keep last 100 log entries
+            "has_more_errors": len(all_errors) > 50
+        }
+
+        if total_errors > 0:
+            flash(f"Processed {total_success} records with {total_errors} errors using '{mapping.name}'", "warning")
+        else:
+            flash(f"Processed {total_success} records successfully using '{mapping.name}'", "success")
+        
         return redirect(url_for("index"))
 
     # =========================================================================
@@ -393,6 +435,197 @@ def create_app(config: dict | None = None) -> Flask:
         """Get all mappings as JSON."""
         mappings = spec_store.get_mappings()
         return jsonify({k: v.to_dict() for k, v in mappings.items()})
+
+    # =========================================================================
+    # ROUTES - File Preview & Edit
+    # =========================================================================
+
+    @app.route("/preview/<source_id>/<filename>")
+    def preview_file(source_id: str, filename: str):
+        """Preview a source file with validation."""
+        source = spec_store.get_source(source_id)
+        if not source:
+            flash("Source not found", "error")
+            return redirect(url_for("index"))
+
+        file_path = app.config["INPUT_DIR"] / source.default_directory / filename
+        if not file_path.exists():
+            flash("File not found", "error")
+            return redirect(url_for("index"))
+
+        # Get available mappings for this source
+        mappings = spec_store.get_mappings_for_source(source_id)
+
+        return render_template(
+            "preview.html",
+            source=source,
+            filename=filename,
+            mappings=mappings,
+        )
+
+    @app.route("/api/preview/<source_id>/<filename>")
+    def api_preview_file(source_id: str, filename: str):
+        """Get file data with optional validation results."""
+        import csv as csv_module
+        
+        source = spec_store.get_source(source_id)
+        if not source:
+            return jsonify({"error": "Source not found"}), 404
+
+        file_path = app.config["INPUT_DIR"] / source.default_directory / filename
+        if not file_path.exists():
+            return jsonify({"error": "File not found"}), 404
+
+        # Read CSV data
+        rows = []
+        columns = []
+        try:
+            with file_path.open(encoding="utf-8") as f:
+                reader = csv_module.DictReader(f)
+                columns = reader.fieldnames or []
+                for line_num, row in enumerate(reader, start=2):
+                    rows.append({
+                        "_line": line_num,
+                        **row
+                    })
+        except Exception as e:
+            return jsonify({"error": f"Failed to read file: {str(e)}"}), 500
+
+        # Optionally validate with a mapping
+        mapping_id = request.args.get("mapping_id")
+        errors_by_line = {}
+        validation_result = None
+        
+        if mapping_id:
+            mapping = spec_store.get_mapping(mapping_id)
+            if mapping:
+                transformer = DynamicTransformer(mapping.to_dict())
+                result = transformer.validate_file(file_path)
+                validation_result = {
+                    "success_count": result.success_count,
+                    "skipped_count": result.skipped_count,
+                    "error_count": result.error_count,
+                    "logs": result.log_messages[-50:],
+                }
+                # Group errors by line number
+                for error in result.errors:
+                    if error.line_number not in errors_by_line:
+                        errors_by_line[error.line_number] = []
+                    errors_by_line[error.line_number].append({
+                        "field": error.field,
+                        "message": error.error_message,
+                        "value": str(error.source_value) if error.source_value else "",
+                    })
+
+        return jsonify({
+            "columns": columns,
+            "rows": rows,
+            "total": len(rows),
+            "errors_by_line": errors_by_line,
+            "validation": validation_result,
+        })
+
+    @app.route("/api/preview/<source_id>/<filename>/update", methods=["POST"])
+    def api_update_row(source_id: str, filename: str):
+        """Update a single row in the CSV file."""
+        import csv as csv_module
+        
+        source = spec_store.get_source(source_id)
+        if not source:
+            return jsonify({"error": "Source not found"}), 404
+
+        file_path = app.config["INPUT_DIR"] / source.default_directory / filename
+        if not file_path.exists():
+            return jsonify({"error": "File not found"}), 404
+
+        data = request.get_json()
+        line_number = data.get("line")
+        updated_row = data.get("row")
+
+        if not line_number or not updated_row:
+            return jsonify({"error": "Missing line number or row data"}), 400
+
+        # Read all rows
+        rows = []
+        columns = []
+        try:
+            with file_path.open(encoding="utf-8") as f:
+                reader = csv_module.DictReader(f)
+                columns = reader.fieldnames or []
+                for line_num, row in enumerate(reader, start=2):
+                    if line_num == line_number:
+                        # Update this row
+                        for col in columns:
+                            if col in updated_row:
+                                row[col] = updated_row[col]
+                    rows.append(row)
+        except Exception as e:
+            return jsonify({"error": f"Failed to read file: {str(e)}"}), 500
+
+        # Write back
+        try:
+            with file_path.open("w", newline="", encoding="utf-8") as f:
+                writer = csv_module.DictWriter(f, fieldnames=columns)
+                writer.writeheader()
+                writer.writerows(rows)
+        except Exception as e:
+            return jsonify({"error": f"Failed to write file: {str(e)}"}), 500
+
+        return jsonify({"success": True, "message": f"Row {line_number} updated"})
+
+    @app.route("/api/preview/<source_id>/<filename>/convert", methods=["POST"])
+    def api_convert_file(source_id: str, filename: str):
+        """Convert a single file after validation passes."""
+        source = spec_store.get_source(source_id)
+        if not source:
+            return jsonify({"error": "Source not found"}), 404
+
+        file_path = app.config["INPUT_DIR"] / source.default_directory / filename
+        if not file_path.exists():
+            return jsonify({"error": "File not found"}), 404
+
+        data = request.get_json()
+        mapping_id = data.get("mapping_id")
+
+        if not mapping_id:
+            return jsonify({"error": "Missing mapping_id"}), 400
+
+        mapping = spec_store.get_mapping(mapping_id)
+        if not mapping:
+            return jsonify({"error": "Mapping not found"}), 404
+
+        destination = spec_store.get_destination(mapping.destination_id)
+        if not destination:
+            return jsonify({"error": "Destination not found"}), 404
+
+        output_dir = app.config["OUTPUT_DIR"] / destination.default_directory
+        output_dir.mkdir(parents=True, exist_ok=True)
+        output_file = output_dir / f"{file_path.stem}_{destination.id}.csv"
+
+        transformer = DynamicTransformer(mapping.to_dict())
+        result = transformer.transform_file(file_path, output_file, fail_on_error=True)
+
+        if result.error_count > 0:
+            return jsonify({
+                "success": False,
+                "message": f"Conversion failed with {result.error_count} errors",
+                "errors": [
+                    {
+                        "line": e.line_number,
+                        "field": e.field,
+                        "message": e.error_message,
+                    }
+                    for e in result.errors[:20]
+                ],
+                "logs": result.log_messages,
+            }), 400
+
+        return jsonify({
+            "success": True,
+            "message": f"Successfully converted {result.success_count} records",
+            "output_file": str(output_file.name),
+            "logs": result.log_messages,
+        })
 
     return app
 
